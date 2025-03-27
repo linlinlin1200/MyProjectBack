@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Кто хочет стать миллионером</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <!-- Можно подключить Bootstrap, если нужно -->
+</head>
+<body>
+<!-- Верхняя панель с кнопками регистрации/входа -->
+<div class="header">
+  <button id="register-btn">Зарегистрироваться</button>
+  <button id="login-btn">Войти</button>
+</div>
+
+<!-- Модальное окно регистрации -->
+<div id="register-modal" class="modal">
+  <div class="modal-content">
+    <h2>Регистрация</h2>
+    <input type="text" id="reg-username" placeholder="Имя пользователя" />
+    <input type="password" id="reg-password" placeholder="Пароль" />
+    <button id="register-submit">Зарегистрироваться</button>
+    <button id="close-register">Закрыть</button>
+  </div>
+</div>
+
+<!-- Модальное окно входа -->
+<div id="login-modal" class="modal">
+  <div class="modal-content">
+    <h2>Вход</h2>
+    <input type="text" id="login-username" placeholder="Имя пользователя" />
+    <input type="password" id="login-password" placeholder="Пароль" />
+    <button id="login-submit">Войти</button>
+    <button id="close-login">Закрыть</button>
+  </div>
+</div>
+
+<!-- Игровой интерфейс -->
+<!-- Боковая панель с логотипом и кнопками "Играть" и "Рейтинг" -->
+<div class="sidebar">
+  <img src="/images/logo.png" alt="Логотип" />
+  <div class="buttons">
+    <button id="play-btn">Играть</button>
+    <button id="rating-btn">Рейтинг</button>
+  </div>
+</div>
+
+<!-- Модальное окно вопросов -->
+<div id="question-modal" class="modal">
+  <div class="modal-content">
+    <h2 id="question-text">Вопрос</h2>
+    <div class="answers">
+      <button class="answer-btn" data-answer="0">Ответ 1</button>
+      <button class="answer-btn" data-answer="1">Ответ 2</button>
+      <button class="answer-btn" data-answer="2">Ответ 3</button>
+      <button class="answer-btn" data-answer="3">Ответ 4</button>
+    </div>
+  </div>
+</div>
+
+<!-- Блок со счётом -->
+<div class="scoreboard">
+  <h2>Ваши баллы: <span id="score">0</span></h2>
+</div>
+
+<!-- Блок с информацией о текущем пользователе -->
+<div class="login">
+  <h2><span id="login-info">Не Зарегистрированный Игрок</span></h2>
+</div>
+
+<!-- Таблица лидеров -->
+<table id="leaderboard">
+  <thead>
+  <tr>
+    <th>Имя пользователя</th>
+    <th>Баллы</th>
+  </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+
+<!-- Модальное окно начала игры -->
+<div id="play-modal" class="modal">
+  <div class="modal-content">
+    <h1>Кто хочет стать миллионером?</h1>
+    <div class="buttons">
+      <button id="confirm-btn">Подтвердить</button>
+      <button id="cancel-btn">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Элементы модальных окон и кнопок
+  const registerModal = document.getElementById('register-modal');
+  const loginModal = document.getElementById('login-modal');
+  const playModal = document.getElementById('play-modal');
+  const registerBtn = document.getElementById('register-btn');
+  const loginBtn = document.getElementById('login-btn');
+  const closeRegisterBtn = document.getElementById('close-register');
+  const closeLoginBtn = document.getElementById('close-login');
+  const playBtn = document.getElementById('play-btn');
+  const cancelPlayBtn = document.getElementById('cancel-btn');
+  const confirmBtn = document.getElementById('confirm-btn');
+
+  // Элементы формы и игры
+  const loginInfo = document.getElementById('login-info');
+  const scoreEl = document.getElementById('score');
+  const questionModal = document.getElementById('question-modal');
+  const questionText = document.getElementById('question-text');
+  const answerButtons = document.querySelectorAll('.answer-btn');
+
+  let score = 0;
+  let currentQuestionIndex = 0;
+  let questions = [];
+
+  // Загрузка вопросов из локального файла questions.json (если используется)
+  fetch('questions.json')
+          .then(response => response.json())
+          .then(data => {
+            questions = data;
+          })
+          .catch(error => console.error('Ошибка загрузки вопросов:', error));
+
+  // Модальные окна для логина/регистрации
+  registerBtn.addEventListener('click', () => { registerModal.style.display = 'flex'; });
+  loginBtn.addEventListener('click', () => { loginModal.style.display = 'flex'; });
+  closeRegisterBtn.addEventListener('click', () => { registerModal.style.display = 'none'; });
+  closeLoginBtn.addEventListener('click', () => { loginModal.style.display = 'none'; });
+
+  // Логика регистрации
+  document.getElementById('register-submit').addEventListener('click', () => {
+    const username = document.getElementById('reg-username').value;
+    const password = document.getElementById('reg-password').value;
+
+    if (username && password) {
+      fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+              .then(response => {
+                if (!response.ok) {
+                  return response.json().then(err => { throw new Error(err.error || 'Ошибка регистрации'); });
+                }
+                return response.json();
+              })
+              .then(result => {
+                alert('Регистрация успешна');
+                registerModal.style.display = 'none';
+                // После регистрации можно сразу выполнить логин:
+                loginInfo.textContent = username;
+                // Можно сохранить пользователя в sessionStorage и установить начальный счет:
+                sessionStorage.setItem('currentUser', JSON.stringify({ username, points: 0 }));
+              })
+              .catch(error => alert(error.message));
+    } else {
+      alert('Заполните все поля');
+    }
+  });
+
+  // Логика входа
+  document.getElementById('login-submit').addEventListener('click', () => {
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    })
+            .then(response => {
+              if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.error || 'Ошибка входа'); });
+              }
+              return response.json();
+            })
+            .then(user => {
+              alert('Вход выполнен успешно');
+              loginModal.style.display = 'none';
+              loginInfo.textContent = user.username;
+              sessionStorage.setItem('currentUser', JSON.stringify(user));
+              // Предполагаем, что бэкенд возвращает поле "score"
+              score = user.score || 0;
+              scoreEl.textContent = score;
+            })
+            .catch(error => alert(error.message));
+  });
+
+  // Логика показа модального окна игры
+  playBtn.addEventListener('click', () => {
+    playModal.style.display = 'flex';
+  });
+  cancelPlayBtn.addEventListener('click', () => {
+    playModal.style.display = 'none';
+  });
+  confirmBtn.addEventListener('click', () => {
+    playModal.style.display = 'none';
+    questionModal.style.display = 'flex';
+    currentQuestionIndex = 0;
+    score = 0;
+    scoreEl.textContent = score;
+    loadQuestion();
+  });
+
+  // Обработка выбора ответа
+  answerButtons.forEach((button, index) => {
+    button.addEventListener('click', () => {
+      if (questions[currentQuestionIndex] && index === questions[currentQuestionIndex].correct_answer) {
+        alert('Верно!');
+        // Локальное увеличение счета
+        score++;
+        scoreEl.textContent = score;
+        // Отправка запроса на инкрементацию очков в базе данных
+        fetch('/api/game/incrementScore', { method: 'POST' })
+                .then(response => {
+                  if (!response.ok) {
+                    throw new Error('Не удалось обновить очки в базе');
+                  }
+                })
+                .catch(error => console.error(error.message));
+        currentQuestionIndex++;
+        if (currentQuestionIndex < questions.length) {
+          loadQuestion();
+        } else {
+          alert('Игра окончена');
+          questionModal.style.display = 'none';
+        }
+      } else {
+        alert('Неверно! Игра окончена.');
+        questionModal.style.display = 'none';
+      }
+    });
+  });
+
+  function loadQuestion() {
+    const currentQuestion = questions[currentQuestionIndex];
+    if (currentQuestion) {
+      questionText.textContent = currentQuestion.question;
+      answerButtons.forEach((button, idx) => {
+        button.textContent = currentQuestion.answers[idx];
+      });
+    }
+  }
+</script>
+</body>
+</html>
