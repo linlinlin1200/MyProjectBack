@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Кто хочет стать миллионером</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="header">
+  <button id="register-btn">Зарегистрироваться</button>
+  <button id="login-btn">Войти</button>
+  <button id="logout-btn" style="display: none;">Выйти</button>
+</div>
+
+<div class="center-container">
+  <img src="/images/logo.jpg" alt="Логотип" class="center-image" />
+  <div class="center-buttons">
+    <button id="play-btn">Играть</button>
+    <button id="rating-btn">Рейтинг</button>
+  </div>
+</div>
+
+<div id="register-modal" class="modal">
+  <div class="modal-content">
+    <h2>Регистрация</h2>
+    <input type="text" id="reg-username" placeholder="Имя пользователя" />
+    <input type="password" id="reg-password" placeholder="Пароль" />
+    <button id="register-submit">Зарегистрироваться</button>
+    <button id="close-register">Закрыть</button>
+  </div>
+</div>
+
+<div id="login-modal" class="modal">
+  <div class="modal-content">
+    <h2>Вход</h2>
+    <input type="text" id="login-username" placeholder="Имя пользователя" />
+    <input type="password" id="login-password" placeholder="Пароль" />
+    <button id="login-submit">Войти</button>
+    <button id="close-login">Закрыть</button>
+  </div>
+</div>
+
+<div id="question-modal" class="modal">
+  <div class="modal-content">
+    <h2 id="question-text">Вопрос</h2>
+    <div class="answers">
+      <button class="answer-btn" data-answer="0">Ответ 1</button>
+      <button class="answer-btn" data-answer="1">Ответ 2</button>
+      <button class="answer-btn" data-answer="2">Ответ 3</button>
+      <button class="answer-btn" data-answer="3">Ответ 4</button>
+    </div>
+  </div>
+</div>
+
+<div class="scoreboard">
+  <h2>Ваши баллы: <span id="score">0</span></h2>
+</div>
+
+<div class="login">
+  <h2><span id="login-info">Гость</span></h2>
+</div>
+
+<div id="leaderboard-container" class="modal">
+  <div class="modal-content">
+    <h2>Таблица лидеров</h2>
+    <table id="leaderboard">
+      <thead>
+      <tr>
+        <th>Игрок</th>
+        <th>Баллы</th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button id="close-leaderboard">Закрыть</button>
+  </div>
+</div>
+
+<div id="play-modal" class="modal">
+  <div class="modal-content">
+    <h1>Кто хочет стать миллионером?</h1>
+    <div class="buttons">
+      <button id="confirm-btn">Подтвердить</button>
+      <button id="cancel-btn">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // fetch: проверка аутентификации
+    fetch('/api/game')
+            .then(response => {
+              if (response.ok) return response.json();
+              throw new Error('Not authenticated');
+            })
+            .then(userData => {
+              loginInfo.textContent = userData.username;
+              scoreEl.textContent = userData.score;
+              logoutBtn.style.display = 'inline-block';
+              loginBtn.style.display = 'none';
+              registerBtn.style.display = 'none';
+            })
+            .catch(() => {});
+  });
+
+  const registerModal = document.getElementById('register-modal');
+  const loginModal = document.getElementById('login-modal');
+  const playModal = document.getElementById('play-modal');
+  const registerBtn = document.getElementById('register-btn');
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const closeRegisterBtn = document.getElementById('close-register');
+  const closeLoginBtn = document.getElementById('close-login');
+  const playBtn = document.getElementById('play-btn');
+  const cancelPlayBtn = document.getElementById('cancel-btn');
+  const confirmBtn = document.getElementById('confirm-btn');
+  const ratingBtn = document.getElementById('rating-btn');
+  const loginInfo = document.getElementById('login-info');
+  const scoreEl = document.getElementById('score');
+  const questionModal = document.getElementById('question-modal');
+  const questionText = document.getElementById('question-text');
+  const answerButtons = document.querySelectorAll('.answer-btn');
+  const leaderboardContainer = document.getElementById('leaderboard-container');
+  const closeLeaderboardBtn = document.getElementById('close-leaderboard');
+
+  let score = 0;
+  let currentQuestionIndex = 0;
+  let questions = [];
+
+  // fetch: загрузка вопросов (без первоначальной рандомизации)
+  fetch('questions.json')
+          .then(response => response.json())
+          .then(data => {
+            questions = data; // сохраняем исходный массив
+          })
+          .catch(error => console.error('Ошибка загрузки вопросов:', error));
+
+  registerBtn.addEventListener('click', () => {
+    registerModal.style.display = 'flex';
+  });
+
+  loginBtn.addEventListener('click', () => {
+    loginModal.style.display = 'flex';
+  });
+
+  closeRegisterBtn.addEventListener('click', () => {
+    registerModal.style.display = 'none';
+  });
+
+  closeLoginBtn.addEventListener('click', () => {
+    loginModal.style.display = 'none';
+  });
+
+  document.getElementById('register-submit').addEventListener('click', () => {
+    const username = document.getElementById('reg-username').value;
+    const password = document.getElementById('reg-password').value;
+    if (username && password) {
+      // fetch: регистрация
+      fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+              .then(response => {
+                if (!response.ok) {
+                  return response.json().then(err => { throw new Error(err.error || 'Ошибка регистрации'); });
+                }
+                return response.json();
+              })
+              .then(result => {
+                alert('Регистрация успешна');
+                registerModal.style.display = 'none';
+                loginInfo.textContent = username;
+              })
+              .catch(error => alert(error.message));
+    } else {
+      alert('Заполните все поля');
+    }
+  });
+
+  document.getElementById('login-submit').addEventListener('click', () => {
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    // fetch: вход
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    })
+            .then(response => {
+              if (!response.ok) {
+                return response.json().then(err => {
+                  throw new Error(err.error || 'Ошибка входа');
+                }).catch(() => {
+                  throw new Error('Сервер вернул неожиданный ответ');
+                });
+              }
+              return response.json();
+            })
+            .then(userData => {
+              alert('Вход выполнен успешно');
+              loginInfo.textContent = userData.username;
+              scoreEl.textContent = userData.score;
+              logoutBtn.style.display = 'inline-block';
+              loginBtn.style.display = 'none';
+              registerBtn.style.display = 'none';
+            })
+            .catch(error => {
+              alert(error.message);
+            });
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    // fetch: выход
+    fetch('/api/auth/logout', { method: 'POST' })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Ошибка при выходе');
+              }
+              return response.json();
+            })
+            .then(result => {
+              alert(result.message);
+              sessionStorage.removeItem('currentUser');
+              loginInfo.textContent = 'Не Зарегистрированный Игрок';
+              score = 0;
+              scoreEl.textContent = score;
+              logoutBtn.style.display = 'none';
+              loginBtn.style.display = 'inline-block';
+              registerBtn.style.display = 'inline-block';
+            })
+            .catch(error => alert(error.message));
+  });
+
+  // При нажатии на "Играть" — открываем модалку и рандомизируем вопросы
+  playBtn.addEventListener('click', () => {
+    // Перемешиваем массив вопросов
+    questions.sort(() => Math.random() - 0.5);
+    playModal.style.display = 'flex';
+  });
+
+  cancelPlayBtn.addEventListener('click', () => {
+    playModal.style.display = 'none';
+  });
+
+  confirmBtn.addEventListener('click', () => {
+    playModal.style.display = 'none';
+    questionModal.style.display = 'flex';
+    currentQuestionIndex = 0;
+    score = 0;
+    scoreEl.textContent = score;
+    loadQuestion();
+  });
+
+  answerButtons.forEach((button, index) => {
+    button.addEventListener('click', () => {
+      if (questions[currentQuestionIndex] && index === questions[currentQuestionIndex].correct_answer) {
+        alert('Верно!');
+        score++;
+        scoreEl.textContent = score;
+        // fetch: инкремент очков
+        fetch('/api/game/incrementScore', { method: 'POST' })
+                .then(response => {
+                  if (!response.ok) {
+                    throw new Error('Не удалось обновить очки в базе');
+                  }
+                })
+                .catch(error => console.error(error.message));
+        currentQuestionIndex++;
+        if (currentQuestionIndex < questions.length) {
+          loadQuestion();
+        } else {
+          alert('Игра окончена');
+          questionModal.style.display = 'none';
+        }
+      } else {
+        alert('Неверно! Игра окончена.');
+        questionModal.style.display = 'none';
+      }
+    });
+  });
+
+  function loadQuestion() {
+    const currentQuestion = questions[currentQuestionIndex];
+    if (currentQuestion) {
+      questionText.textContent = currentQuestion.question;
+      answerButtons.forEach((button, idx) => {
+        button.textContent = currentQuestion.answers[idx];
+      });
+    }
+  }
+
+  // Показ таблицы лидеров
+  ratingBtn.addEventListener('click', () => {
+    // fetch: загрузка лидеров
+    fetch('/api/leaderboard')
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Ошибка при получении списка лидеров');
+              }
+              return response.json();
+            })
+            .then(data => {
+              const leaderboardBody = document.querySelector('#leaderboard tbody');
+              leaderboardBody.innerHTML = '';
+              data.forEach(item => {
+                const row = document.createElement('tr');
+                const userCell = document.createElement('td');
+                userCell.textContent = item.username;
+                const scoreCell = document.createElement('td');
+                scoreCell.textContent = item.score;
+                row.appendChild(userCell);
+                row.appendChild(scoreCell);
+                leaderboardBody.appendChild(row);
+              });
+              leaderboardContainer.style.display = 'flex';
+            })
+            .catch(error => {
+              alert(error.message);
+            });
+  });
+
+  closeLeaderboardBtn.addEventListener('click', () => {
+    leaderboardContainer.style.display = 'none';
+  });
+</script>
+</body>
+</html>
